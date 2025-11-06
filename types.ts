@@ -1,3 +1,4 @@
+
 export interface ReportData {
   congregacao: string;
   area: string;
@@ -91,8 +92,4 @@ export interface ReportData {
   ministVisitasMinisteriais: number;
   ministVisitasApoiosArea: number;
   ministDiasDiscipuladoFormouCultos: number;
-
-  // Assinaturas
-  dirigenteAssinatura: string;
-  secretariaAssinatura: string;
 }
