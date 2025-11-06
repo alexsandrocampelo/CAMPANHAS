@@ -4,7 +4,7 @@ import {
   AREAS, MONTHS, WEEK_DAYS, SABADO_CULTOS,
   IconCheckCircle, IconDashboard, IconExport, IconInfo, IconBuilding,
   IconGraduationCap, IconClipboardList, IconUsers, IconHeart, IconGift,
-  IconBookOpen, IconLocationMarker, IconBriefcase, IconShieldCheck
+  IconBookOpen, IconLocationMarker, IconBriefcase, IconShieldCheck, IconArrowLeft
 } from './constants';
 import Dashboard from './Dashboard';
 
@@ -67,7 +67,7 @@ const InfoBox: React.FC<InfoBoxProps> = ({ children, color }) => {
     return (<div className={`p-4 border-l-4 ${colorClasses[color]} mb-6 rounded-r-md`}><div className="flex"><div className="flex-shrink-0"><IconInfo className="h-5 w-5" /></div><div className="ml-3"><p className="text-sm">{children}</p></div></div></div>);
 };
 
-const Header: React.FC<{ onDashboardClick: () => void }> = ({ onDashboardClick }) => (
+const Header: React.FC<{ onDashboardClick: () => void; onCoordinatorClick: () => void; }> = ({ onDashboardClick, onCoordinatorClick }) => (
   <header className="bg-gray-800 text-white p-6 rounded-t-lg shadow-lg">
     <h1 className="text-2xl font-bold">IGREJA EVANGÉLICA ASSEMBLEIA DE DEUS</h1>
     <h2 className="text-3xl font-extrabold text-blue-300">EM PERNAMBUCO</h2>
@@ -79,7 +79,7 @@ const Header: React.FC<{ onDashboardClick: () => void }> = ({ onDashboardClick }
         <div className="ml-3 text-sm"><p>Sincronização Automática Ativa</p><p className="text-gray-400">Última sync: {new Date().toLocaleTimeString()}</p></div>
       </div>
       <div className="flex items-center space-x-2">
-        <button className="flex items-center bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-md transition duration-300"><IconCheckCircle className="h-5 w-5 mr-2" /> Validação</button>
+        <button onClick={onCoordinatorClick} className="flex items-center bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-md transition duration-300"><IconCheckCircle className="h-5 w-5 mr-2" /> Validação</button>
         <button onClick={onDashboardClick} className="flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"><IconDashboard className="h-5 w-5 mr-2" /> Ver Dashboard</button>
       </div>
     </div>
@@ -106,17 +106,18 @@ interface ReportFormProps {
   onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   onRadioChange: (e: ChangeEvent<HTMLInputElement>) => void;
   setFormData: React.Dispatch<React.SetStateAction<ReportData>>;
+  onFinalSubmit: (data: ReportData) => void;
 }
 
-const ReportForm: React.FC<ReportFormProps> = ({ formData, onInputChange, onRadioChange, setFormData }) => {
+const ReportForm: React.FC<ReportFormProps> = ({ formData, onInputChange, onRadioChange, setFormData, onFinalSubmit }) => {
   const [currentStep, setCurrentStep] = useState(1);
 
   const handleNextStep = () => setCurrentStep(prev => prev + 1);
   const handlePrevStep = () => setCurrentStep(prev => prev - 1);
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      console.log('Form Submitted:', formData);
-      alert('Relatório enviado com sucesso!');
+      onFinalSubmit(formData);
+      setCurrentStep(1); // Reset to first step for next report
   };
 
   return (
@@ -276,7 +277,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ formData, onInputChange, onRadi
                 </Section>
                 <div className="flex justify-between items-center mt-8">
                     <button type="button" onClick={handlePrevStep} className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300 flex items-center"><span className="mr-2">←</span> Voltar</button>
-                    <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 flex items-center disabled:opacity-50 disabled:cursor-not-allowed" disabled={!formData.dirigenteAssinatura || !formData.secretariaAssinatura}><IconCheckCircle className="h-5 w-5 mr-2" /> Enviar Relatório Final</button>
+                    <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 flex items-center disabled:opacity-50 disabled:cursor-not-allowed" disabled={!formData.dirigenteAssinatura || !formData.secretariaAssinatura}><IconCheckCircle className="h-5 w-5 mr-2" /> Enviar para Validação</button>
                 </div>
             </form>
         )}
@@ -284,11 +285,11 @@ const ReportForm: React.FC<ReportFormProps> = ({ formData, onInputChange, onRadi
   );
 };
 
-const AuthModal: React.FC<{ title: string; description: string; onAuthSuccess: () => void; onClose: () => void; }> = ({ title, description, onAuthSuccess, onClose }) => {
+const AuthModal: React.FC<{ title: string; description: string; onAuthSuccess: () => void; onClose: () => void; correctPassword: string; }> = ({ title, description, onAuthSuccess, onClose, correctPassword }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const handleAuth = () => {
-    if (password === 'dashboard123') { onAuthSuccess(); } 
+    if (password === correctPassword) { onAuthSuccess(); } 
     else { setError('Senha incorreta. Tente novamente.'); setPassword(''); }
   };
   const handleKeyPress = (e: React.KeyboardEvent) => { if (e.key === 'Enter') { handleAuth(); } };
@@ -308,11 +309,67 @@ const AuthModal: React.FC<{ title: string; description: string; onAuthSuccess: (
   );
 };
 
+interface SubmittedReport {
+  data: ReportData;
+  status: 'pending' | 'validated';
+}
+
+const CoordinatorView: React.FC<{ onBack: () => void; reports: SubmittedReport[]; onValidate: (index: number) => void; }> = ({ onBack, reports, onValidate }) => {
+  const pendingReports = reports.filter(r => r.status === 'pending');
+
+  return (
+    <div className="bg-white p-8 rounded-lg shadow-lg animate-fade-in">
+        <div className="flex justify-between items-center mb-8 border-b-2 border-gray-200 pb-4">
+            <h1 className="text-3xl font-bold text-gray-800">Portal de Validação do Coordenador</h1>
+            <button onClick={onBack} className="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                <IconArrowLeft className="h-5 w-5 mr-2" /> Voltar ao Formulário
+            </button>
+        </div>
+
+        {pendingReports.length === 0 ? (
+          <div className="text-center py-12">
+            <IconCheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold text-gray-700">Tudo Certo!</h2>
+            <p className="text-gray-500 mt-2">Nenhum relatório pendente de validação no momento.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {reports.map((report, index) => (
+              <div key={index} className={`p-6 rounded-lg shadow-md border-l-4 ${report.status === 'pending' ? 'bg-white border-yellow-500' : 'bg-green-50 border-green-500'}`}>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xl font-bold text-gray-800">{report.data.congregacao}</p>
+                    <p className="text-sm text-gray-500">{report.data.area} - {report.data.mes}/{report.data.ano}</p>
+                    <p className="text-sm text-gray-600 mt-2">Enviado por: {report.data.dirigenteAssinatura}</p>
+                  </div>
+                  <div>
+                    {report.status === 'pending' ? (
+                      <button onClick={() => onValidate(index)} className="flex items-center bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                        <IconCheckCircle className="h-5 w-5 mr-2" /> Validar Relatório
+                      </button>
+                    ) : (
+                      <div className="flex items-center text-green-600 font-semibold bg-green-100 px-4 py-2 rounded-full">
+                        <IconCheckCircle className="h-5 w-5 mr-2" /> Validado
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+    </div>
+  );
+};
+
+
 const App: React.FC = () => {
-  const [view, setView] = useState<'form' | 'dashboard'>('form');
+  const [view, setView] = useState<'form' | 'dashboard' | 'coordinator'>('form');
   const [showDashboardModal, setShowDashboardModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showCoordinatorModal, setShowCoordinatorModal] = useState(false);
   const [formData, setFormData] = useState<ReportData>(initialFormData);
+  const [submittedReports, setSubmittedReports] = useState<SubmittedReport[]>([]);
 
   const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -365,25 +422,40 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const handleFormSubmit = (data: ReportData) => {
+    setSubmittedReports(prev => [...prev, { data, status: 'pending' }]);
+    setFormData(initialFormData);
+    alert('Relatório enviado com sucesso para validação do Coordenador!');
+  };
+  
+  const handleValidateReport = (indexToValidate: number) => {
+    setSubmittedReports(prev => 
+      prev.map((report, index) => 
+        index === indexToValidate ? { ...report, status: 'validated' } : report
+      )
+    );
+  };
+
+
   return (
     <>
       <div className="flex min-h-screen">
         <div className="w-16 bg-gradient-to-b from-purple-600 to-indigo-700 flex-shrink-0 hidden md:block"></div>
         <main className="flex-grow p-4 sm:p-6 md:p-8">
           <div className="max-w-4xl mx-auto">
-            {view === 'form' ? (
+            {view === 'form' && (
               <>
-                <Header onDashboardClick={() => setShowDashboardModal(true)} />
+                <Header onDashboardClick={() => setShowDashboardModal(true)} onCoordinatorClick={() => setShowCoordinatorModal(true)} />
                 <div className="bg-white p-6 shadow-lg">
                   <button onClick={() => setShowExportModal(true)} className="flex items-center w-full justify-center bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-md transition duration-300">
                       <IconExport className="h-5 w-5 mr-2" /> Exportar para Excel
                   </button>
                 </div>
-                <ReportForm formData={formData} onInputChange={handleInputChange} onRadioChange={handleRadioChange} setFormData={setFormData} />
+                <ReportForm formData={formData} onInputChange={handleInputChange} onRadioChange={handleRadioChange} setFormData={setFormData} onFinalSubmit={handleFormSubmit} />
               </>
-            ) : (
-              <Dashboard onBack={() => setView('form')} />
             )}
+            {view === 'dashboard' && <Dashboard onBack={() => setView('form')} />}
+            {view === 'coordinator' && <CoordinatorView onBack={() => setView('form')} reports={submittedReports} onValidate={handleValidateReport} />}
           </div>
         </main>
         <div className="w-16 bg-gradient-to-b from-blue-500 to-cyan-500 flex-shrink-0 hidden md:block"></div>
@@ -395,6 +467,17 @@ const App: React.FC = () => {
           description="Por favor, insira a senha para visualizar o dashboard."
           onAuthSuccess={() => { setView('dashboard'); setShowDashboardModal(false); }}
           onClose={() => setShowDashboardModal(false)}
+          correctPassword="dashboard123"
+        />
+      )}
+
+      {showCoordinatorModal && (
+        <AuthModal 
+          title="Acesso do Coordenador"
+          description="Por favor, insira a senha de coordenador para validar os relatórios."
+          onAuthSuccess={() => { setView('coordinator'); setShowCoordinatorModal(false); }}
+          onClose={() => setShowCoordinatorModal(false)}
+          correctPassword="coordenador123"
         />
       )}
 
@@ -404,6 +487,7 @@ const App: React.FC = () => {
           description="Por favor, insira a senha para exportar os dados para Excel (CSV)."
           onAuthSuccess={() => { handleDataExport(); setShowExportModal(false); }}
           onClose={() => setShowExportModal(false)}
+          correctPassword="dashboard123"
         />
       )}
     </>
